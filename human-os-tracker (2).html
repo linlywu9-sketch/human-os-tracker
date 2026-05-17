@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human OS · 规划及进度</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F6F3;--card:#fff;--bd:#E8E6E0;--bd2:#C8C5BC;
+  --t1:#1A1916;--t2:#5C5A54;--t3:#9B9890;
+  --purple:#7F77DD;--purple-bg:#EEEDFE;--purple-tc:#4E46B4;
+  --green:#1D9E75;--green-bg:#E1F5EE;--green-tc:#085041;
+  --amber:#B08A1A;--amber-bg:#FBF3DC;--amber-tc:#7A5E0A;
+  --gray-bg:#F1EFE8;--gray-tc:#444441;
+  --red:#B53131;
+  --r:12px;--rsm:8px;
+}
+html{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+body{max-width:1100px;margin:0 auto;padding:2rem 1.5rem 5rem}
+button,input,textarea,select{font-family:'DM Sans',sans-serif;outline:none}
+
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:1.25rem}
+.hdr-title{font-size:24px;font-weight:600;color:var(--t1);letter-spacing:-.3px;margin-bottom:3px}
+.hdr-sub{font-size:11px;color:var(--t3);letter-spacing:.04em;text-transform:uppercase}
+.hdr-actions{display:flex;gap:7px;flex-shrink:0;align-items:flex-start;margin-top:4px}
+.btn{font-size:12px;padding:6px 12px;border-radius:var(--rsm);cursor:pointer;border:1px solid var(--bd);background:var(--card);color:var(--t2);transition:all .12s;display:inline-flex;align-items:center;gap:5px}
+.btn:hover{border-color:var(--bd2);color:var(--t1)}
+.btn-primary{background:var(--purple);color:#fff;border-color:var(--purple)}
+.btn-primary:hover{background:#6B63C9;border-color:#6B63C9;color:#fff}
+.btn-sm{font-size:11px;padding:4px 9px;border-radius:6px}
+.btn-green{background:var(--green-bg);color:var(--green-tc);border-color:#8EDEC4}
+.btn-green:hover{background:#CCF0E2;color:var(--green-tc)}
+
+/* sync status bar */
+.sync-bar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--card);border:1px solid var(--bd);border-radius:var(--rsm);margin-bottom:1rem;font-size:11px}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sync-dot.ok{background:var(--green)}
+.sync-dot.err{background:var(--red)}
+.sync-dot.loading{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.tabs{display:flex;border-bottom:1px solid var(--bd);margin-bottom:1.25rem}
+.tab{font-size:13px;padding:9px 18px;cursor:pointer;border:none;background:transparent;color:var(--t3);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .12s;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif}
+.tab.active{color:var(--t1);font-weight:500}
+
+.stats{display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:var(--rsm);padding:8px 14px;text-align:center;min-width:80px}
+.stat-label{font-size:10px;color:var(--t3);margin-bottom:3px;font-family:'DM Mono',monospace}
+.stat-val{font-size:20px;font-weight:600;line-height:1}
+
+.pbar{height:3px;background:var(--bd);border-radius:2px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:2px;transition:width .6s ease}
+
+/* Section 1 */
+.s1-note{background:var(--card);border:1px solid var(--bd);border-radius:var(--rsm);padding:10px 14px;font-size:11px;color:var(--t3);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.layers-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.layer-card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:13px 14px}
+.layer-id{font-size:11px;font-weight:500;background:var(--purple-bg);color:var(--purple-tc);padding:2px 8px;border-radius:4px;font-family:'DM Mono',monospace}
+.status-btns{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.status-btn{font-size:10px;padding:2px 7px;border-radius:4px;cursor:pointer;border:1px solid var(--bd);background:transparent;color:var(--t3);transition:all .1s}
+.status-btn.active{border-color:var(--purple-tc);background:var(--purple-bg);color:var(--purple-tc)}
+
+/* Section 2 */
+.stream{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:8px}
+.stream-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;transition:background .1s}
+.stream-hdr:hover{background:#FAFAF8}
+.stream-id{width:22px;height:22px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.stream-info{flex:1;min-width:0}
+.stream-name{font-size:14px;font-weight:500;color:var(--t1);margin-bottom:3px}
+.stream-actions{display:flex;gap:6px;flex-shrink:0}
+.stream-toggle{font-size:12px;padding:3px 8px;border:1px solid var(--bd);border-radius:5px;cursor:pointer;background:transparent;color:var(--t3);font-family:'DM Mono',monospace}
+
+/* Sub table */
+.sub-wrap{border-top:1px solid var(--bd);background:var(--bg);overflow-x:auto}
+.sub-table{width:100%;border-collapse:collapse;font-size:12px;min-width:600px}
+.sub-table th{padding:7px 12px;text-align:left;font-size:10px;font-weight:500;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;background:var(--bg);border-bottom:1px solid var(--bd);white-space:nowrap}
+.sub-table td{padding:9px 12px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.sub-table tr:last-child td{border-bottom:none}
+.sub-table tbody tr:hover td{background:rgba(255,255,255,.7)}
+.badge{font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.badge-pending{background:var(--gray-bg);color:var(--gray-tc)}
+.badge-wip{background:var(--amber-bg);color:var(--amber-tc)}
+.badge-live{background:var(--green-bg);color:var(--green-tc)}
+.icon-btn{font-size:12px;padding:3px 6px;border:none;background:none;cursor:pointer;color:var(--t3);border-radius:4px;transition:all .1s}
+.icon-btn:hover{color:var(--t1);background:var(--bd)}
+
+/* Modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(26,25,22,.5);z-index:100;align-items:flex-start;justify-content:center;padding-top:80px}
+.overlay.show{display:flex}
+.modal{background:var(--card);border-radius:16px;padding:22px 24px;width:500px;max-width:95vw;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.modal-title{font-size:15px;font-weight:600;color:var(--t1)}
+.modal-close{font-size:20px;color:var(--t3);border:none;background:none;cursor:pointer;padding:0 4px;line-height:1}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:11px;color:var(--t3);margin-bottom:4px;font-family:'DM Mono',monospace}
+.field input,.field textarea{width:100%;font-size:12px;padding:7px 10px;border-radius:var(--rsm);border:1px solid var(--bd);background:var(--bg);color:var(--t1);transition:border-color .12s}
+.field input:focus{border-color:var(--purple)}
+.status-select{display:flex;gap:8px}
+.status-opt{font-size:11px;padding:5px 14px;border-radius:20px;cursor:pointer;border:1px solid var(--bd);background:transparent;color:var(--t2);transition:all .12s}
+.status-opt.sel-pending{border-color:var(--gray-tc)!important;background:var(--gray-bg)!important;color:var(--gray-tc)!important;font-weight:500}
+.status-opt.sel-wip{border-color:var(--amber-tc)!important;background:var(--amber-bg)!important;color:var(--amber-tc)!important;font-weight:500}
+.status-opt.sel-live{border-color:var(--green-tc)!important;background:var(--green-bg)!important;color:var(--green-tc)!important;font-weight:500}
+.modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.err-msg{font-size:11px;color:var(--red);margin-top:4px}
+.info-box{background:var(--bg);border:1px solid var(--bd);border-radius:var(--rsm);padding:10px 14px;font-size:11px;color:var(--t3);line-height:1.7}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <div class="hdr-sub">2026–2027 · Human Resources Intelligence Operating System</div>
+    <div class="hdr-title">Human OS 规划及进度</div>
+  </div>
+  <div class="hdr-actions">
+    <button class="btn btn-green" onclick="syncFromFeishu()">↻ 从飞书同步</button>
+    <button class="btn" onclick="openSettings()">⚙ 飞书配置</button>
+    <button class="btn btn-primary" onclick="requestClaudeSync()">Claude 同步 ↗</button>
+  </div>
+</div>
+
+<!-- Sync status bar -->
+<div class="sync-bar" id="sync-bar">
+  <span class="sync-dot" id="sync-dot"></span>
+  <span id="sync-msg" style="color:var(--t2)">正在连接飞书...</span>
+  <span style="flex:1"></span>
+  <span id="sync-time" style="color:var(--t3)"></span>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" id="tab-s1" onclick="switchTab('s1')">
+    一、HROS 原生系统
+    <span style="font-size:10px;color:var(--t3)">(2027)</span>
+    <span id="tab-s1-pct" style="font-size:11px;font-weight:500;color:var(--purple)"></span>
+  </button>
+  <button class="tab" id="tab-s2" onclick="switchTab('s2')">
+    二、HR 智能化规划
+    <span style="font-size:10px;color:var(--t3)">(2026)</span>
+    <span id="tab-s2-pct" style="font-size:11px;font-weight:500;color:var(--green)"></span>
+  </button>
+</div>
+
+<!-- Section 1 -->
+<div id="sec-s1">
+  <div class="s1-note">
+    <span>进度来源：Claude Code · HR OS / HR intelligent agent system architecture design</span>
+    <button class="btn btn-sm" onclick="requestCodeSync()">从 Claude Code 同步 ↗</button>
+  </div>
+  <div class="layers-grid" id="layers-grid"></div>
+</div>
+
+<!-- Section 2 -->
+<div id="sec-s2" style="display:none">
+  <div class="stats">
+    <div class="stat"><div class="stat-label">板块整体进度</div><div class="stat-val" id="avg-pct" style="color:var(--purple)">—</div></div>
+    <div class="stat"><div class="stat-label">子项目总数</div><div class="stat-val" id="total-subs">—</div></div>
+    <div class="stat"><div class="stat-label">已上线</div><div class="stat-val" id="cnt-live" style="color:var(--green)">—</div></div>
+    <div class="stat"><div class="stat-label">进展中</div><div class="stat-val" id="cnt-wip" style="color:var(--amber)">—</div></div>
+    <div class="stat"><div class="stat-label">待立项</div><div class="stat-val" id="cnt-pending" style="color:var(--t3)">—</div></div>
+  </div>
+  <div id="streams-wrap"></div>
+</div>
+
+<!-- Sub edit modal -->
+<div class="overlay" id="sub-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="sub-modal-title">添加子项目</div>
+      <button class="modal-close" onclick="closeModal('sub-modal')">✕</button>
+    </div>
+    <div class="field"><label>子项目名称 *</label><input id="f-name" placeholder="输入名称"></div>
+    <div class="field">
+      <label>状态</label>
+      <div class="status-select">
+        <button class="status-opt" data-s="待立项" onclick="selectStatus('待立项')">待立项</button>
+        <button class="status-opt" data-s="进展中" onclick="selectStatus('进展中')">进展中</button>
+        <button class="status-opt" data-s="已上线" onclick="selectStatus('已上线')">已上线</button>
+      </div>
+    </div>
+    <div class="field"><label>关键里程碑</label><input id="f-milestone" placeholder="关键交付或成果"></div>
+    <div class="field"><label>负责人</label><input id="f-owner" placeholder="姓名或角色"></div>
+    <div class="field"><label>日期</label><input id="f-date" type="date"></div>
+    <div id="sub-modal-err" class="err-msg" style="display:none"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('sub-modal')">取消</button>
+      <button class="btn btn-primary" id="sub-save-btn" onclick="saveSub()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stream progress modal -->
+<div class="overlay" id="stream-modal">
+  <div class="modal" style="width:380px">
+    <div class="modal-head">
+      <div class="modal-title">编辑板块进度</div>
+      <button class="modal-close" onclick="closeModal('stream-modal')">✕</button>
+    </div>
+    <div class="field">
+      <label>整体进度 <span id="stream-pct-lbl">0</span>%</label>
+      <input type="range" min="0" max="100" step="5" id="stream-pct-input"
+        oninput="document.getElementById('stream-pct-lbl').textContent=this.value" style="width:100%;margin-top:4px">
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('stream-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveStreamProgress()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settings-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">飞书多维表配置</div>
+      <button class="modal-close" onclick="closeModal('settings-modal')">✕</button>
+    </div>
+    <div class="info-box" style="margin-bottom:14px">
+      部署到 Netlify 后，请在 Netlify 后台「Environment Variables」填入以下4个变量，无需在此手动填写。<br><br>
+      本地调试时可在下方填写（仅存本地，不上传）。
+    </div>
+    <div class="field"><label>FEISHU_APP_ID</label><input id="fs-appid" placeholder="cli_xxxxxx"></div>
+    <div class="field"><label>FEISHU_APP_SECRET</label><input id="fs-secret" type="password" placeholder="xxxxxxxxxx"></div>
+    <div class="field"><label>FEISHU_APP_TOKEN（多维表格 URL 中的 base/ 后面）</label><input id="fs-token" placeholder="BExxxxxx"></div>
+    <div class="field"><label>FEISHU_TABLE_ID（URL 中 table= 后面）</label><input id="fs-tableid" placeholder="tblxxxxxx"></div>
+    <div id="settings-msg" style="font-size:11px;color:var(--green);margin-top:6px"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('settings-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存（本地）</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ──────────────────────────────────────────────────────────────────
+const SK = 'human-os-v1';
+const today = () => new Date().toISOString().slice(0, 10);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const BADGE = { '待立项': 'badge-pending', '进展中': 'badge-wip', '已上线': 'badge-live' };
+const L_STATUS_COL = {
+  '规划中': ['#F1EFE8','#444441'], '设计中': ['#FBF3DC','#7A5E0A'],
+  '部分接入': ['#E1F5EE','#085041'], '开发中': ['#E6F1FB','#1255A0'], '已完成': ['#EEEDFE','#4E46B4'],
+};
+
+const STREAMS_META = [
+  {id:1,n:'①',name:'制度体系',col:'#7F77DD',bg:'#EEEDFE',tc:'#4E46B4',v21:'L5治理 · 职级规则体系'},
+  {id:2,n:'②',name:'AI原生招聘',col:'#378ADD',bg:'#E6F1FB',tc:'#1255A0',v21:'A2H集群 · 目标10 Agent'},
+  {id:3,n:'③',name:'入职自动化（90天）',col:'#C4511E',bg:'#FAEADE',tc:'#8B3410',v21:'H2P集群 · 目标2+Agent'},
+  {id:4,n:'④',name:'绩效激励系统',col:'#B08A1A',bg:'#FBF3DC',tc:'#7A5E0A',v21:'P2D集群 · 目标7 Agent'},
+  {id:5,n:'⑤',name:'人才发展（AiLab）',col:'#1D9E75',bg:'#E1F5EE',tc:'#085041',v21:'D2M集群 · 目标6 Agent'},
+  {id:6,n:'⑥',name:'员工福利',col:'#4E8A18',bg:'#EBF3DE',tc:'#27500A',v21:'留任体验集群 · 目标6 Agent'},
+  {id:7,n:'⑦',name:'人力预算管理',col:'#534AB7',bg:'#EEEDFE',tc:'#332D8A',v21:'WFP场景 · 编制规划Agent'},
+  {id:8,n:'⑧',name:'HR基础系统',col:'#7A7874',bg:'#F1EFE8',tc:'#444441',v21:'L6数据层 · 8源整合底座'},
+  {id:9,n:'⑨',name:'员工服务台',col:'#C4406A',bg:'#FBEAF0',tc:'#8A2048',v21:'L1业务应用 · HR人工工作台'},
+];
+
+const DEFAULT_S2 = STREAMS_META.map(m => ({ ...m, progress: 0, exp: false, subs: [] }));
+
+const DEFAULT_SUBS = [
+  {stream_id:1,name:'职级校准体系',status:'已上线',milestone:'P4-P12五大域校准完成',owner:'HR负责人',date:'2026-04-01'},
+  {stream_id:1,name:'海外用工规范',status:'已上线',milestone:'港籍派驻三件套落地',owner:'HRBP',date:'2026-04-15'},
+  {stream_id:1,name:'COE知识库',status:'进展中',milestone:'COE标准库v1设计完成',owner:'HR负责人',date:'2026-05-01'},
+  {stream_id:1,name:'职级试点落地',status:'进展中',milestone:'综合管理域+营销toC试点启动',owner:'HRBP',date:'2026-06-01'},
+  {stream_id:2,name:'Offer审批自动化',status:'已上线',milestone:'119条流程剧本上线',owner:'招聘负责人',date:'2026-04-10'},
+  {stream_id:2,name:'实习生招聘流程',status:'已上线',milestone:'精选流程上线',owner:'招聘负责人',date:'2026-04-20'},
+  {stream_id:2,name:'AI招聘主架构',status:'待立项',milestone:'10个Agent规划设计',owner:'HR Tech',date:'2026-07-01'},
+  {stream_id:3,name:'入职工作台PRD',status:'已上线',milestone:'v0.3完成，7 Agent 80%自主率设计',owner:'HR Tech',date:'2026-05-10'},
+  {stream_id:3,name:'入职MVP实施',status:'进展中',milestone:'10周排期启动，6月底首里程碑',owner:'HR Tech',date:'2026-06-01'},
+  {stream_id:3,name:'90天融入追踪',status:'待立项',milestone:'里程碑打卡+HRBP预警',owner:'HRBP',date:'2026-07-15'},
+  {stream_id:3,name:'考勤系统对接',status:'待立项',milestone:'盖雅+入职系统数据打通',owner:'IT',date:'2026-06-15'},
+  {stream_id:4,name:'政府创收激励平台',status:'已上线',milestone:'平台上线稳定运行',owner:'薪酬负责人',date:'2026-04-01'},
+  {stream_id:4,name:'Q1人力分析V2.1',status:'已上线',milestone:'13图6真相，Netlify双链部署',owner:'HR负责人',date:'2026-05-01'},
+  {stream_id:4,name:'部门激励看板V1.0',status:'进展中',milestone:'各业务线激励可视化，5/31截止',owner:'HR负责人',date:'2026-05-31'},
+  {stream_id:4,name:'OKR对齐Agent',status:'待立项',milestone:'绩效与目标自动关联',owner:'HR Tech',date:'2026-07-01'},
+  {stream_id:5,name:'AiLab运营体系',status:'已上线',milestone:'150智能体管理，双周CEO汇报',owner:'AiLab负责人',date:'2026-04-01'},
+  {stream_id:5,name:'埋点改造方案',status:'进展中',milestone:'A类智能体埋点设计完成',owner:'HR Tech',date:'2026-05-15'},
+  {stream_id:5,name:'技能图谱v1',status:'待立项',milestone:'全员技能标签体系建立',owner:'HR Tech',date:'2026-07-01'},
+  {stream_id:6,name:'落户名额分配系统',status:'已上线',milestone:'9阶段全量上线，自动分配',owner:'HR负责人',date:'2026-03-01'},
+  {stream_id:6,name:'飞书价值评估卡片',status:'进展中',milestone:'调用统计与价值评估机制设计',owner:'员工体验',date:'2026-05-17'},
+  {stream_id:6,name:'季度礼包发放平台',status:'待立项',milestone:'复用落户Next.js+飞书栈立项',owner:'员工体验',date:'2026-06-01'},
+  {stream_id:7,name:'系统立项',status:'待立项',milestone:'PRD与技术方案完成',owner:'待定',date:'2026-07-01'},
+  {stream_id:7,name:'编制规划Agent',status:'待立项',milestone:'P3阶段上线',owner:'HR Tech',date:'2026-11-01'},
+  {stream_id:8,name:'Hermes Gateway',status:'已上线',milestone:'5/15修复，飞书+微信双连',owner:'IT',date:'2026-05-15'},
+  {stream_id:8,name:'HRIS/ATS运行',status:'已上线',milestone:'Moka等系统正常运行',owner:'IT',date:'2026-01-01'},
+  {stream_id:8,name:'员工档案底座',status:'待立项',milestone:'8源整合+281 KPI统一口径',owner:'HR Tech',date:'2026-06-01'},
+  {stream_id:8,name:'数据底座立项',status:'进展中',milestone:'P1核心任务，统一口径规划',owner:'HR Tech',date:'2026-05-17'},
+  {stream_id:9,name:'飞书架构对照',status:'已上线',milestone:'5层50项，95%原生能力验证',owner:'员工体验',date:'2026-05-01'},
+  {stream_id:9,name:'30+免费能力启用',status:'进展中',milestone:'6月全量启用计划',owner:'员工体验',date:'2026-06-01'},
+  {stream_id:9,name:'冲刺开发15+项',status:'待立项',milestone:'2-4周完成定制开发',owner:'HR Tech',date:'2026-06-15'},
+];
+
+// Progress stored locally (user sets manually)
+const DEFAULT_PROGRESS = {1:60,2:45,3:55,4:50,5:42,6:78,7:5,8:33,9:42};
+
+let DATA = {
+  s1: {
+    layers: [
+      {id:'L1',name:'业务应用层',status:'规划中',progress:10,items:'HR智能体驾驶舱 · HRPilot副驾 · HR人工工作台 · HR经营分析总览'},
+      {id:'L2',name:'场景引擎层',status:'规划中',progress:5,items:'A2H · H2P · P2D · D2M · M2R · R2A · WFP · AOC'},
+      {id:'L3',name:'基础引擎层',status:'规划中',progress:8,items:'数据中枢 · 主题合仓 · 模型中心 · 决策中心 · 闭环引擎 · 执行追踪'},
+      {id:'L4',name:'智能体矩阵 38',status:'设计中',progress:20,items:'人才招募10个 · 融入发展8个 · 绩效流动7个 · 留任体验6个 · 组织效能5个'},
+      {id:'L5',name:'治理层',status:'规划中',progress:5,items:'准则/账套 · 风险/权限 · 规则卡 · 合规 · 平台底版'},
+      {id:'L6',name:'数据层',status:'部分接入',progress:30,items:'HRIS/ATS · OA协作 · 学习系统 · 绩效系统 · 薪酬社保 · 招聘渠道 · 外部基准'},
+    ]
+  },
+  s2: JSON.parse(JSON.stringify(DEFAULT_S2)),
+  progress: { ...DEFAULT_PROGRESS },
+};
+
+let editSubCtx = { sid: null, subid: null };
+let editStreamId = null;
+let curStatus = '进展中';
+let curTab = 's1';
+let feishuConnected = false;
+
+// ─── LOCAL STORAGE ──────────────────────────────────────────────────────────
+function loadLocal() {
+  try {
+    const d = localStorage.getItem(SK);
+    if (d) DATA = JSON.parse(d);
+  } catch (e) {}
+}
+function saveLocal() {
+  try { localStorage.setItem(SK, JSON.stringify(DATA)); } catch (e) {}
+}
+
+// ─── FEISHU API ─────────────────────────────────────────────────────────────
+const API = '/api/feishu'; // Netlify function endpoint
+
+function tsToDate(ts) {
+  if (!ts) return '';
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+// Parse a Feishu record into local sub format
+function parseRecord(rec) {
+  const f = rec.fields;
+  return {
+    id: rec.record_id,
+    record_id: rec.record_id,
+    stream_id: Number(f['板块ID']) || 0,
+    name: f['子项目'] || '',
+    status: (typeof f['状态'] === 'object' ? f['状态']?.text : f['状态']) || '待立项',
+    milestone: f['里程碑'] || '',
+    owner: f['负责人'] || '',
+    date: f['日期'] ? tsToDate(f['日期']) : '',
+  };
+}
+
+async function feishuRequest(body) {
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+async function syncFromFeishu() {
+  setSyncStatus('loading', '正在从飞书同步...');
+  try {
+    const data = await feishuRequest({ method: 'list' });
+    const records = data.items || [];
+
+    // Reset sub-projects for all streams
+    DATA.s2 = DATA.s2.map(s => ({ ...s, subs: [] }));
+
+    records.forEach(rec => {
+      const sub = parseRecord(rec);
+      const stream = DATA.s2.find(s => s.id === sub.stream_id);
+      if (stream) stream.subs.push(sub);
+    });
+
+    feishuConnected = true;
+    const t = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    setSyncStatus('ok', `已与飞书同步 · ${records.length} 条记录`, t);
+    saveLocal();
+    render();
+  } catch (e) {
+    setSyncStatus('err', '飞书连接失败（检查 Netlify 环境变量配置）');
+    console.error(e);
+  }
+}
+
+async function feishuCreate(sub, streamMeta) {
+  return feishuRequest({
+    method: 'create',
+    fields: {
+      stream_id: sub.stream_id,
+      stream_name: streamMeta.name,
+      name: sub.name,
+      status: sub.status,
+      milestone: sub.milestone,
+      owner: sub.owner,
+      date: sub.date,
+    }
+  });
+}
+
+async function feishuUpdate(sub) {
+  return feishuRequest({
+    method: 'update',
+    recordId: sub.record_id,
+    fields: {
+      stream_id: sub.stream_id,
+      name: sub.name,
+      status: sub.status,
+      milestone: sub.milestone,
+      owner: sub.owner,
+      date: sub.date,
+    }
+  });
+}
+
+async function feishuDelete(recordId) {
+  return feishuRequest({ method: 'delete', recordId });
+}
+
+// ─── SYNC STATUS BAR ────────────────────────────────────────────────────────
+function setSyncStatus(state, msg, time) {
+  const dot = document.getElementById('sync-dot');
+  const msgEl = document.getElementById('sync-msg');
+  const timeEl = document.getElementById('sync-time');
+  dot.className = 'sync-dot ' + state;
+  msgEl.textContent = msg;
+  if (time) timeEl.textContent = time;
+}
+
+// ─── TAB ────────────────────────────────────────────────────────────────────
+function switchTab(t) {
+  curTab = t;
+  ['s1', 's2'].forEach(x => {
+    document.getElementById('tab-' + x).classList.toggle('active', x === t);
+    document.getElementById('sec-' + x).style.display = x === t ? '' : 'none';
+  });
+}
+
+// ─── SECTION 1 ──────────────────────────────────────────────────────────────
+const L_STATUSES = ['规划中', '设计中', '部分接入', '开发中', '已完成'];
+
+function renderS1() {
+  const avg = Math.round(DATA.s1.layers.reduce((a, l) => a + l.progress, 0) / DATA.s1.layers.length);
+  document.getElementById('tab-s1-pct').textContent = avg + '%';
+  const g = document.getElementById('layers-grid');
+  g.innerHTML = '';
+  DATA.s1.layers.forEach(l => {
+    const [sbg, stc] = L_STATUS_COL[l.status] || ['#F1EFE8', '#444441'];
+    const div = document.createElement('div');
+    div.className = 'layer-card';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="layer-id">${l.id}</span>
+          <span style="font-size:13px;font-weight:500;color:var(--t1)">${l.name}</span>
+        </div>
+        <span class="badge" style="background:${sbg};color:${stc}">${l.status}</span>
+      </div>
+      <div class="pbar" style="margin-bottom:4px"><div class="pbar-fill" style="width:${l.progress}%;background:var(--purple)"></div></div>
+      <div style="font-size:10px;color:var(--t3);font-family:'DM Mono',monospace;margin-bottom:10px">${l.progress}%</div>
+      <div style="font-size:11px;color:var(--t2);line-height:1.7">${l.items}</div>
+      <div class="status-btns">
+        ${L_STATUSES.map(s => `<button class="status-btn${l.status === s ? ' active' : ''}" onclick="setLayerStatus('${l.id}','${s}')">${s}</button>`).join('')}
+      </div>`;
+    g.appendChild(div);
+  });
+}
+
+function setLayerStatus(lid, st) {
+  DATA.s1.layers = DATA.s1.layers.map(l => l.id === lid ? { ...l, status: st } : l);
+  saveLocal(); renderS1();
+}
+
+// ─── SECTION 2 ──────────────────────────────────────────────────────────────
+function renderS2() {
+  // Apply stored progress
+  DATA.s2 = DATA.s2.map(s => ({ ...s, progress: DATA.progress[s.id] || 0 }));
+
+  const allSubs = DATA.s2.flatMap(s => s.subs);
+  const avg = DATA.s2.length ? Math.round(DATA.s2.reduce((a, s) => a + s.progress, 0) / DATA.s2.length) : 0;
+
+  document.getElementById('avg-pct').textContent = avg + '%';
+  document.getElementById('tab-s2-pct').textContent = avg + '%';
+  document.getElementById('total-subs').textContent = allSubs.length;
+  document.getElementById('cnt-live').textContent = allSubs.filter(x => x.status === '已上线').length;
+  document.getElementById('cnt-wip').textContent = allSubs.filter(x => x.status === '进展中').length;
+  document.getElementById('cnt-pending').textContent = allSubs.filter(x => x.status === '待立项').length;
+
+  const wrap = document.getElementById('streams-wrap');
+  wrap.innerHTML = '';
+
+  DATA.s2.forEach(s => {
+    const done = s.subs.filter(x => x.status === '已上线').length;
+    const ing = s.subs.filter(x => x.status === '进展中').length;
+    const pend = s.subs.filter(x => x.status === '待立项').length;
+
+    const div = document.createElement('div');
+    div.className = 'stream';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'stream-hdr';
+    hdr.innerHTML = `
+      <span class="stream-id" style="background:${s.bg};color:${s.tc}">${s.n}</span>
+      <div class="stream-info">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:3px">
+          <span class="stream-name">${s.name}</span>
+          <span style="font-size:10px;color:var(--t3);font-family:'DM Mono',monospace">${s.v21}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:120px"><div class="pbar"><div class="pbar-fill" style="width:${s.progress}%;background:${s.col}"></div></div></div>
+          <span style="font-size:10px;color:var(--t3);font-family:'DM Mono',monospace">${s.progress}%</span>
+          <span style="font-size:10px;color:var(--green-tc)">已上线 ${done}</span>
+          <span style="font-size:10px;color:var(--amber-tc)">进展中 ${ing}</span>
+          <span style="font-size:10px;color:var(--t3)">待立项 ${pend}</span>
+        </div>
+      </div>
+      <div class="stream-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-sm" onclick="openEditStream(${s.id})">编辑进度</button>
+        <button class="btn btn-sm" onclick="openAddSub(${s.id})">+ 添加</button>
+        <button class="stream-toggle" onclick="toggleStream(${s.id})">${s.exp ? '▲' : '▼'}</button>
+      </div>`;
+    hdr.addEventListener('click', () => toggleStream(s.id));
+    div.appendChild(hdr);
+
+    if (s.exp) {
+      const subWrap = document.createElement('div');
+      subWrap.className = 'sub-wrap';
+      let html = `<table class="sub-table">
+        <thead><tr>
+          <th style="width:18%">子项目</th>
+          <th style="width:9%">状态</th>
+          <th style="width:33%">关键里程碑</th>
+          <th style="width:12%">负责人</th>
+          <th style="width:10%">日期</th>
+          <th style="width:8%"></th>
+        </tr></thead><tbody>`;
+      s.subs.forEach(sub => {
+        html += `<tr>
+          <td style="font-weight:500;color:var(--t1);white-space:nowrap">${sub.name}</td>
+          <td><span class="badge ${BADGE[sub.status] || 'badge-pending'}">${sub.status}</span></td>
+          <td style="color:var(--t2);line-height:1.5">${sub.milestone || '—'}</td>
+          <td style="color:var(--t2);white-space:nowrap">${sub.owner || '—'}</td>
+          <td style="color:var(--t3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${sub.date || '—'}</td>
+          <td style="white-space:nowrap">
+            <button class="icon-btn" onclick="openEditSub(${s.id},'${sub.id || sub.record_id}')" title="编辑">✎</button>
+            <button class="icon-btn" onclick="delSub(${s.id},'${sub.id || sub.record_id}','${sub.record_id || ''}')" title="删除">✕</button>
+          </td>
+        </tr>`;
+      });
+      if (!s.subs.length) {
+        html += `<tr><td colspan="6" style="padding:14px 12px;color:var(--t3);text-align:center;font-size:11px">暂无子项目，点「+ 添加」创建</td></tr>`;
+      }
+      html += '</tbody></table>';
+      subWrap.innerHTML = html;
+      div.appendChild(subWrap);
+    }
+    wrap.appendChild(div);
+  });
+}
+
+function toggleStream(id) {
+  DATA.s2 = DATA.s2.map(s => s.id === id ? { ...s, exp: !s.exp } : s);
+  saveLocal(); renderS2();
+}
+
+// ─── SUB EDIT ───────────────────────────────────────────────────────────────
+function openAddSub(sid) {
+  editSubCtx = { sid, subid: 'new' };
+  document.getElementById('sub-modal-title').textContent = '添加子项目';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-milestone').value = '';
+  document.getElementById('f-owner').value = '';
+  document.getElementById('f-date').value = today();
+  document.getElementById('sub-modal-err').style.display = 'none';
+  selectStatus('进展中');
+  openModal('sub-modal');
+}
+
+function openEditSub(sid, subId) {
+  editSubCtx = { sid, subid: subId };
+  const stream = DATA.s2.find(s => s.id === sid);
+  const sub = stream.subs.find(x => (x.id || x.record_id) === subId);
+  document.getElementById('sub-modal-title').textContent = '编辑子项目';
+  document.getElementById('f-name').value = sub.name || '';
+  document.getElementById('f-milestone').value = sub.milestone || '';
+  document.getElementById('f-owner').value = sub.owner || '';
+  document.getElementById('f-date').value = sub.date || today();
+  document.getElementById('sub-modal-err').style.display = 'none';
+  selectStatus(sub.status || '进展中');
+  openModal('sub-modal');
+}
+
+function selectStatus(s) {
+  curStatus = s;
+  document.querySelectorAll('.status-opt').forEach(btn => {
+    btn.className = 'status-opt';
+    if (btn.dataset.s === s) {
+      if (s === '待立项') btn.classList.add('sel-pending');
+      else if (s === '进展中') btn.classList.add('sel-wip');
+      else btn.classList.add('sel-live');
+    }
+  });
+}
+
+async function saveSub() {
+  const name = document.getElementById('f-name').value.trim();
+  const errEl = document.getElementById('sub-modal-err');
+  if (!name) { errEl.textContent = '请填写子项目名称'; errEl.style.display = 'block'; return; }
+
+  const btn = document.getElementById('sub-save-btn');
+  btn.textContent = '保存中...'; btn.disabled = true;
+  errEl.style.display = 'none';
+
+  const stream = DATA.s2.find(s => s.id === editSubCtx.sid);
+  const subData = {
+    stream_id: editSubCtx.sid,
+    name,
+    status: curStatus,
+    milestone: document.getElementById('f-milestone').value.trim(),
+    owner: document.getElementById('f-owner').value.trim(),
+    date: document.getElementById('f-date').value,
+  };
+
+  try {
+    if (editSubCtx.subid === 'new') {
+      // Create
+      const newSub = { id: uid(), ...subData };
+      if (feishuConnected) {
+        const rec = await feishuCreate(subData, stream);
+        newSub.record_id = rec.record_id;
+        newSub.id = rec.record_id;
+      }
+      DATA.s2 = DATA.s2.map(s => s.id === editSubCtx.sid ? { ...s, subs: [...s.subs, newSub] } : s);
+    } else {
+      // Update
+      const existing = stream.subs.find(x => (x.id || x.record_id) === editSubCtx.subid);
+      const updated = { ...existing, ...subData };
+      if (feishuConnected && existing.record_id) await feishuUpdate(updated);
+      DATA.s2 = DATA.s2.map(s => s.id === editSubCtx.sid
+        ? { ...s, subs: s.subs.map(x => (x.id || x.record_id) === editSubCtx.subid ? updated : x) }
+        : s);
+    }
+    saveLocal();
+    closeModal('sub-modal');
+    renderS2();
+  } catch (e) {
+    errEl.textContent = '保存失败: ' + e.message;
+    errEl.style.display = 'block';
+  }
+  btn.textContent = '保存'; btn.disabled = false;
+}
+
+async function delSub(sid, subId, recordId) {
+  if (!confirm('删除此子项目？')) return;
+  if (feishuConnected && recordId) {
+    try { await feishuDelete(recordId); } catch (e) { alert('飞书删除失败: ' + e.message); return; }
+  }
+  DATA.s2 = DATA.s2.map(s => s.id === sid
+    ? { ...s, subs: s.subs.filter(x => (x.id || x.record_id) !== subId) }
+    : s);
+  saveLocal(); renderS2();
+}
+
+// ─── STREAM PROGRESS ────────────────────────────────────────────────────────
+function openEditStream(id) {
+  editStreamId = id;
+  const p = DATA.progress[id] || 0;
+  document.getElementById('stream-pct-input').value = p;
+  document.getElementById('stream-pct-lbl').textContent = p;
+  openModal('stream-modal');
+}
+function saveStreamProgress() {
+  DATA.progress[editStreamId] = +document.getElementById('stream-pct-input').value;
+  saveLocal(); closeModal('stream-modal'); renderS2();
+}
+
+// ─── SETTINGS ───────────────────────────────────────────────────────────────
+function openSettings() {
+  const fs = JSON.parse(localStorage.getItem('feishu-local') || '{}');
+  document.getElementById('fs-appid').value = fs.appId || '';
+  document.getElementById('fs-secret').value = fs.appSecret || '';
+  document.getElementById('fs-token').value = fs.appToken || '';
+  document.getElementById('fs-tableid').value = fs.tableId || '';
+  document.getElementById('settings-msg').textContent = '';
+  openModal('settings-modal');
+}
+function saveSettings() {
+  const fs = {
+    appId: document.getElementById('fs-appid').value.trim(),
+    appSecret: document.getElementById('fs-secret').value.trim(),
+    appToken: document.getElementById('fs-token').value.trim(),
+    tableId: document.getElementById('fs-tableid').value.trim(),
+  };
+  localStorage.setItem('feishu-local', JSON.stringify(fs));
+  document.getElementById('settings-msg').textContent = '✓ 已保存到本地（仅用于本地调试）';
+}
+
+// ─── MODAL ──────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.addEventListener('click', e => { if (e.target.classList.contains('overlay')) e.target.classList.remove('show'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.overlay.show').forEach(el => el.classList.remove('show')); });
+
+// ─── SYNC PROMPTS ────────────────────────────────────────────────────────────
+function requestClaudeSync() { alert('在 Claude 对话中发送：\n\n「请搜索历史对话，提取9个HR OS板块最新进展，逐一告诉我进度和里程碑」'); }
+function requestCodeSync() { alert('在 Claude 对话中发送：\n\n「请搜索 Claude Code 里的 HR OS 项目，提取 L1-L6 各层最新状态和进度」'); }
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+function render() { renderS1(); renderS2(); }
+
+loadLocal();
+
+// Try to load subs from local if available, else use defaults
+if (DATA.s2.every(s => s.subs.length === 0)) {
+  DEFAULT_SUBS.forEach(sub => {
+    const stream = DATA.s2.find(s => s.id === sub.stream_id);
+    if (stream) stream.subs.push({ id: uid(), ...sub });
+  });
+  saveLocal();
+}
+
+render();
+
+// Auto-sync from Feishu on load
+syncFromFeishu().catch(() => {
+  setSyncStatus('err', '未连接飞书（数据来自本地缓存）');
+});
+</script>
+</body>
+</html>

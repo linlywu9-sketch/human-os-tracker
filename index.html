@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -116,9 +115,7 @@ button,input,textarea,select{font-family:'DM Sans',sans-serif;outline:none}
     <div class="hdr-title">Human OS 规划及进度</div>
   </div>
   <div class="hdr-actions">
-    <button class="btn btn-green" onclick="syncFromFeishu()">↻ 从飞书同步</button>
-    <button class="btn" onclick="confirmBatchPush()" id="push-btn">↑ 初始化到飞书</button>
-    <button class="btn" onclick="openSettings()">⚙ 飞书配置</button>
+    <button class="btn btn-green" onclick="syncFromCloud()">↻ 云端同步</button>
     <button class="btn btn-primary" onclick="requestClaudeSync()">Claude 同步 ↗</button>
   </div>
 </div>
@@ -126,7 +123,7 @@ button,input,textarea,select{font-family:'DM Sans',sans-serif;outline:none}
 <!-- Sync status bar -->
 <div class="sync-bar" id="sync-bar">
   <span class="sync-dot" id="sync-dot"></span>
-  <span id="sync-msg" style="color:var(--t2)">正在连接飞书...</span>
+  <span id="sync-msg" style="color:var(--t2)">正在加载云端数据...</span>
   <span style="flex:1"></span>
   <span id="sync-time" style="color:var(--t3)"></span>
 </div>
@@ -328,462 +325,44 @@ function saveLocal() {
   try { localStorage.setItem(SK, JSON.stringify(DATA)); } catch (e) {}
 }
 
-// ─── FEISHU API ─────────────────────────────────────────────────────────────
-const API = '/api/feishu'; // Netlify function endpoint
+// ─── VERCEL KV API ──────────────────────────────────────────────────────────
+const API = '/api/data';
 
-function tsToDate(ts) {
-  if (!ts) return '';
-  return new Date(ts).toISOString().slice(0, 10);
-}
-
-// Parse a Feishu record into local sub format
-function parseRecord(rec) {
-  const f = rec.fields;
-  return {
-    id: rec.record_id,
-    record_id: rec.record_id,
-    stream_id: Number(f['板块ID']) || 0,
-    name: f['子项目'] || '',
-    status: (typeof f['状态'] === 'object' ? f['状态']?.text : f['状态']) || '待立项',
-    milestone: f['里程碑'] || '',
-    owner: f['负责人'] || '',
-    date: f['日期'] ? tsToDate(f['日期']) : '',
-  };
-}
-
-async function feishuRequest(body) {
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
-}
-
-async function syncFromFeishu() {
-  setSyncStatus('loading', '正在从飞书同步...');
+async function syncFromCloud() {
+  setSyncStatus('loading', '正在从云端同步...');
   try {
-    const data = await feishuRequest({ method: 'list' });
-    const records = data.items || [];
-
-    // Reset sub-projects for all streams
-    DATA.s2 = DATA.s2.map(s => ({ ...s, subs: [] }));
-
-    records.forEach(rec => {
-      const sub = parseRecord(rec);
-      const stream = DATA.s2.find(s => s.id === sub.stream_id);
-      if (stream) stream.subs.push(sub);
-    });
-
-    feishuConnected = true;
-    const t = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    setSyncStatus('ok', `已与飞书同步 · ${records.length} 条记录`, t);
-    saveLocal();
-    render();
-  } catch (e) {
-    setSyncStatus('err', '飞书连接失败（检查 Netlify 环境变量配置）');
-    console.error(e);
-  }
-}
-
-async function feishuCreate(sub, streamMeta) {
-  return feishuRequest({
-    method: 'create',
-    fields: {
-      stream_id: sub.stream_id,
-      stream_name: streamMeta.name,
-      name: sub.name,
-      status: sub.status,
-      milestone: sub.milestone,
-      owner: sub.owner,
-      date: sub.date,
-    }
-  });
-}
-
-async function feishuUpdate(sub) {
-  return feishuRequest({
-    method: 'update',
-    recordId: sub.record_id,
-    fields: {
-      stream_id: sub.stream_id,
-      name: sub.name,
-      status: sub.status,
-      milestone: sub.milestone,
-      owner: sub.owner,
-      date: sub.date,
-    }
-  });
-}
-
-async function feishuDelete(recordId) {
-  return feishuRequest({ method: 'delete', recordId });
-}
-
-// ─── SYNC STATUS BAR ────────────────────────────────────────────────────────
-function setSyncStatus(state, msg, time) {
-  const dot = document.getElementById('sync-dot');
-  const msgEl = document.getElementById('sync-msg');
-  const timeEl = document.getElementById('sync-time');
-  dot.className = 'sync-dot ' + state;
-  msgEl.textContent = msg;
-  if (time) timeEl.textContent = time;
-}
-
-// ─── TAB ────────────────────────────────────────────────────────────────────
-function switchTab(t) {
-  curTab = t;
-  ['s1', 's2'].forEach(x => {
-    document.getElementById('tab-' + x).classList.toggle('active', x === t);
-    document.getElementById('sec-' + x).style.display = x === t ? '' : 'none';
-  });
-}
-
-// ─── SECTION 1 ──────────────────────────────────────────────────────────────
-const L_STATUSES = ['规划中', '设计中', '部分接入', '开发中', '已完成'];
-
-function renderS1() {
-  const avg = Math.round(DATA.s1.layers.reduce((a, l) => a + l.progress, 0) / DATA.s1.layers.length);
-  document.getElementById('tab-s1-pct').textContent = avg + '%';
-  const g = document.getElementById('layers-grid');
-  g.innerHTML = '';
-  DATA.s1.layers.forEach(l => {
-    const [sbg, stc] = L_STATUS_COL[l.status] || ['#F1EFE8', '#444441'];
-    const div = document.createElement('div');
-    div.className = 'layer-card';
-    div.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="layer-id">${l.id}</span>
-          <span style="font-size:13px;font-weight:500;color:var(--t1)">${l.name}</span>
-        </div>
-        <span class="badge" style="background:${sbg};color:${stc}">${l.status}</span>
-      </div>
-      <div class="pbar" style="margin-bottom:4px"><div class="pbar-fill" style="width:${l.progress}%;background:var(--purple)"></div></div>
-      <div style="font-size:10px;color:var(--t3);font-family:'DM Mono',monospace;margin-bottom:10px">${l.progress}%</div>
-      <div style="font-size:11px;color:var(--t2);line-height:1.7">${l.items}</div>
-      <div class="status-btns">
-        ${L_STATUSES.map(s => `<button class="status-btn${l.status === s ? ' active' : ''}" onclick="setLayerStatus('${l.id}','${s}')">${s}</button>`).join('')}
-      </div>`;
-    g.appendChild(div);
-  });
-}
-
-function setLayerStatus(lid, st) {
-  DATA.s1.layers = DATA.s1.layers.map(l => l.id === lid ? { ...l, status: st } : l);
-  saveLocal(); renderS1();
-}
-
-// ─── SECTION 2 ──────────────────────────────────────────────────────────────
-function renderS2() {
-  // Apply stored progress
-  DATA.s2 = DATA.s2.map(s => ({ ...s, progress: DATA.progress[s.id] || 0 }));
-
-  const allSubs = DATA.s2.flatMap(s => s.subs);
-  const avg = DATA.s2.length ? Math.round(DATA.s2.reduce((a, s) => a + s.progress, 0) / DATA.s2.length) : 0;
-
-  document.getElementById('avg-pct').textContent = avg + '%';
-  document.getElementById('tab-s2-pct').textContent = avg + '%';
-  document.getElementById('total-subs').textContent = allSubs.length;
-  document.getElementById('cnt-live').textContent = allSubs.filter(x => x.status === '已上线').length;
-  document.getElementById('cnt-wip').textContent = allSubs.filter(x => x.status === '进展中').length;
-  document.getElementById('cnt-pending').textContent = allSubs.filter(x => x.status === '待立项').length;
-
-  const wrap = document.getElementById('streams-wrap');
-  wrap.innerHTML = '';
-
-  DATA.s2.forEach(s => {
-    const done = s.subs.filter(x => x.status === '已上线').length;
-    const ing = s.subs.filter(x => x.status === '进展中').length;
-    const pend = s.subs.filter(x => x.status === '待立项').length;
-
-    const div = document.createElement('div');
-    div.className = 'stream';
-
-    const hdr = document.createElement('div');
-    hdr.className = 'stream-hdr';
-    hdr.innerHTML = `
-      <span class="stream-id" style="background:${s.bg};color:${s.tc}">${s.n}</span>
-      <div class="stream-info">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:3px">
-          <span class="stream-name">${s.name}</span>
-          <span style="font-size:10px;color:var(--t3);font-family:'DM Mono',monospace">${s.v21}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:120px"><div class="pbar"><div class="pbar-fill" style="width:${s.progress}%;background:${s.col}"></div></div></div>
-          <span style="font-size:10px;color:var(--t3);font-family:'DM Mono',monospace">${s.progress}%</span>
-          <span style="font-size:10px;color:var(--green-tc)">已上线 ${done}</span>
-          <span style="font-size:10px;color:var(--amber-tc)">进展中 ${ing}</span>
-          <span style="font-size:10px;color:var(--t3)">待立项 ${pend}</span>
-        </div>
-      </div>
-      <div class="stream-actions" onclick="event.stopPropagation()">
-        <button class="btn btn-sm" onclick="openEditStream(${s.id})">编辑进度</button>
-        <button class="btn btn-sm" onclick="openAddSub(${s.id})">+ 添加</button>
-        <button class="stream-toggle" onclick="toggleStream(${s.id})">${s.exp ? '▲' : '▼'}</button>
-      </div>`;
-    hdr.addEventListener('click', () => toggleStream(s.id));
-    div.appendChild(hdr);
-
-    if (s.exp) {
-      const subWrap = document.createElement('div');
-      subWrap.className = 'sub-wrap';
-      let html = `<table class="sub-table">
-        <thead><tr>
-          <th style="width:18%">子项目</th>
-          <th style="width:9%">状态</th>
-          <th style="width:33%">关键里程碑</th>
-          <th style="width:12%">负责人</th>
-          <th style="width:10%">日期</th>
-          <th style="width:8%"></th>
-        </tr></thead><tbody>`;
-      s.subs.forEach(sub => {
-        html += `<tr>
-          <td style="font-weight:500;color:var(--t1);white-space:nowrap">${sub.name}</td>
-          <td><span class="badge ${BADGE[sub.status] || 'badge-pending'}">${sub.status}</span></td>
-          <td style="color:var(--t2);line-height:1.5">${sub.milestone || '—'}</td>
-          <td style="color:var(--t2);white-space:nowrap">${sub.owner || '—'}</td>
-          <td style="color:var(--t3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${sub.date || '—'}</td>
-          <td style="white-space:nowrap">
-            <button class="icon-btn" onclick="openEditSub(${s.id},'${sub.id || sub.record_id}')" title="编辑">✎</button>
-            <button class="icon-btn" onclick="delSub(${s.id},'${sub.id || sub.record_id}','${sub.record_id || ''}')" title="删除">✕</button>
-          </td>
-        </tr>`;
-      });
-      if (!s.subs.length) {
-        html += `<tr><td colspan="6" style="padding:14px 12px;color:var(--t3);text-align:center;font-size:11px">暂无子项目，点「+ 添加」创建</td></tr>`;
-      }
-      html += '</tbody></table>';
-      subWrap.innerHTML = html;
-      div.appendChild(subWrap);
-    }
-    wrap.appendChild(div);
-  });
-}
-
-function toggleStream(id) {
-  DATA.s2 = DATA.s2.map(s => s.id === id ? { ...s, exp: !s.exp } : s);
-  saveLocal(); renderS2();
-}
-
-// ─── SUB EDIT ───────────────────────────────────────────────────────────────
-function openAddSub(sid) {
-  editSubCtx = { sid, subid: 'new' };
-  document.getElementById('sub-modal-title').textContent = '添加子项目';
-  document.getElementById('f-name').value = '';
-  document.getElementById('f-milestone').value = '';
-  document.getElementById('f-owner').value = '';
-  document.getElementById('f-date').value = today();
-  document.getElementById('sub-modal-err').style.display = 'none';
-  selectStatus('进展中');
-  openModal('sub-modal');
-}
-
-function openEditSub(sid, subId) {
-  editSubCtx = { sid, subid: subId };
-  const stream = DATA.s2.find(s => s.id === sid);
-  const sub = stream.subs.find(x => (x.id || x.record_id) === subId);
-  document.getElementById('sub-modal-title').textContent = '编辑子项目';
-  document.getElementById('f-name').value = sub.name || '';
-  document.getElementById('f-milestone').value = sub.milestone || '';
-  document.getElementById('f-owner').value = sub.owner || '';
-  document.getElementById('f-date').value = sub.date || today();
-  document.getElementById('sub-modal-err').style.display = 'none';
-  selectStatus(sub.status || '进展中');
-  openModal('sub-modal');
-}
-
-function selectStatus(s) {
-  curStatus = s;
-  document.querySelectorAll('.status-opt').forEach(btn => {
-    btn.className = 'status-opt';
-    if (btn.dataset.s === s) {
-      if (s === '待立项') btn.classList.add('sel-pending');
-      else if (s === '进展中') btn.classList.add('sel-wip');
-      else btn.classList.add('sel-live');
-    }
-  });
-}
-
-async function saveSub() {
-  const name = document.getElementById('f-name').value.trim();
-  const errEl = document.getElementById('sub-modal-err');
-  if (!name) { errEl.textContent = '请填写子项目名称'; errEl.style.display = 'block'; return; }
-
-  const btn = document.getElementById('sub-save-btn');
-  btn.textContent = '保存中...'; btn.disabled = true;
-  errEl.style.display = 'none';
-
-  const stream = DATA.s2.find(s => s.id === editSubCtx.sid);
-  const subData = {
-    stream_id: editSubCtx.sid,
-    name,
-    status: curStatus,
-    milestone: document.getElementById('f-milestone').value.trim(),
-    owner: document.getElementById('f-owner').value.trim(),
-    date: document.getElementById('f-date').value,
-  };
-
-  try {
-    if (editSubCtx.subid === 'new') {
-      // Create
-      const newSub = { id: uid(), ...subData };
-      if (feishuConnected) {
-        const rec = await feishuCreate(subData, stream);
-        newSub.record_id = rec.record_id;
-        newSub.id = rec.record_id;
-      }
-      DATA.s2 = DATA.s2.map(s => s.id === editSubCtx.sid ? { ...s, subs: [...s.subs, newSub] } : s);
+    const res = await fetch(API);
+    const { data } = await res.json();
+    if (data && data.s1 && data.s2) {
+      DATA = data;
+      saveLocal();
+      const t = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      setSyncStatus('ok', `已从云端同步`, t);
+      render();
     } else {
-      // Update
-      const existing = stream.subs.find(x => (x.id || x.record_id) === editSubCtx.subid);
-      const updated = { ...existing, ...subData };
-      if (feishuConnected && existing.record_id) await feishuUpdate(updated);
-      DATA.s2 = DATA.s2.map(s => s.id === editSubCtx.sid
-        ? { ...s, subs: s.subs.map(x => (x.id || x.record_id) === editSubCtx.subid ? updated : x) }
-        : s);
+      // No cloud data yet, push local to cloud
+      await pushToCloud();
     }
-    saveLocal();
-    closeModal('sub-modal');
-    renderS2();
   } catch (e) {
-    errEl.textContent = '保存失败: ' + e.message;
-    errEl.style.display = 'block';
-  }
-  btn.textContent = '保存'; btn.disabled = false;
-}
-
-async function delSub(sid, subId, recordId) {
-  if (!confirm('删除此子项目？')) return;
-  if (feishuConnected && recordId) {
-    try { await feishuDelete(recordId); } catch (e) { alert('飞书删除失败: ' + e.message); return; }
-  }
-  DATA.s2 = DATA.s2.map(s => s.id === sid
-    ? { ...s, subs: s.subs.filter(x => (x.id || x.record_id) !== subId) }
-    : s);
-  saveLocal(); renderS2();
-}
-
-// ─── STREAM PROGRESS ────────────────────────────────────────────────────────
-function openEditStream(id) {
-  editStreamId = id;
-  const p = DATA.progress[id] || 0;
-  document.getElementById('stream-pct-input').value = p;
-  document.getElementById('stream-pct-lbl').textContent = p;
-  openModal('stream-modal');
-}
-function saveStreamProgress() {
-  DATA.progress[editStreamId] = +document.getElementById('stream-pct-input').value;
-  saveLocal(); closeModal('stream-modal'); renderS2();
-}
-
-// ─── SETTINGS ───────────────────────────────────────────────────────────────
-function openSettings() {
-  const fs = JSON.parse(localStorage.getItem('feishu-local') || '{}');
-  document.getElementById('fs-appid').value = fs.appId || '';
-  document.getElementById('fs-secret').value = fs.appSecret || '';
-  document.getElementById('fs-token').value = fs.appToken || '';
-  document.getElementById('fs-tableid').value = fs.tableId || '';
-  document.getElementById('settings-msg').textContent = '';
-  openModal('settings-modal');
-}
-function saveSettings() {
-  const fs = {
-    appId: document.getElementById('fs-appid').value.trim(),
-    appSecret: document.getElementById('fs-secret').value.trim(),
-    appToken: document.getElementById('fs-token').value.trim(),
-    tableId: document.getElementById('fs-tableid').value.trim(),
-  };
-  localStorage.setItem('feishu-local', JSON.stringify(fs));
-  document.getElementById('settings-msg').textContent = '✓ 已保存到本地（仅用于本地调试）';
-}
-
-// ─── MODAL ──────────────────────────────────────────────────────────────────
-function openModal(id) { document.getElementById(id).classList.add('show'); }
-function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-document.addEventListener('click', e => { if (e.target.classList.contains('overlay')) e.target.classList.remove('show'); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.overlay.show').forEach(el => el.classList.remove('show')); });
-
-// ─── BATCH PUSH TO FEISHU ───────────────────────────────────────────────────
-async function confirmBatchPush() {
-  const allSubs = DATA.s2.flatMap(s => s.subs);
-  if (!confirm(`将把本地 ${allSubs.length} 条子项目全部写入飞书多维表，飞书现有数据会被清空后重新写入。确认继续？`)) return;
-  await batchPushToFeishu();
-}
-
-async function batchPushToFeishu() {
-  const btn = document.getElementById('push-btn');
-  btn.textContent = '写入中...'; btn.disabled = true;
-  setSyncStatus('loading', '正在清空飞书旧数据...');
-
-  try {
-    // Step 1: Get all existing records and delete them
-    const existing = await feishuRequest({ method: 'list' });
-    const records = existing.items || [];
-    setSyncStatus('loading', `正在删除 ${records.length} 条旧记录...`);
-
-    for (const rec of records) {
-      await feishuDelete(rec.record_id);
-    }
-
-    // Step 2: Push all local subs
-    const allSubs = DATA.s2.flatMap(s => {
-      const meta = STREAMS_META.find(m => m.id === s.id);
-      return s.subs.map(sub => ({ ...sub, stream_id: s.id, stream_name: meta?.name || '' }));
-    });
-
-    setSyncStatus('loading', `正在写入 ${allSubs.length} 条数据...`);
-    let done = 0;
-    for (const sub of allSubs) {
-      const rec = await feishuCreate(sub, { name: sub.stream_name });
-      // Update local record_id
-      DATA.s2 = DATA.s2.map(s => {
-        if (s.id !== sub.stream_id) return s;
-        return { ...s, subs: s.subs.map(x => x.id === sub.id ? { ...x, record_id: rec.record_id, id: rec.record_id } : x) };
-      });
-      done++;
-      setSyncStatus('loading', `写入中 ${done}/${allSubs.length}...`);
-    }
-
-    feishuConnected = true;
-    saveLocal();
-    const t = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    setSyncStatus('ok', `✓ 已成功写入飞书 ${allSubs.length} 条数据`, t);
-    render();
-    alert(`✅ 完成！${allSubs.length} 条子项目已全部写入飞书多维表，现在网页修改会实时同步到飞书。`);
-
-  } catch (e) {
-    setSyncStatus('err', '写入失败: ' + e.message);
-    alert('写入失败: ' + e.message);
+    setSyncStatus('err', '云端连接失败（使用本地数据）');
     console.error(e);
   }
-
-  btn.textContent = '↑ 初始化到飞书'; btn.disabled = false;
 }
 
-// ─── SYNC PROMPTS ────────────────────────────────────────────────────────────
-function requestClaudeSync() { alert('在 Claude 对话中发送：\n\n「请搜索历史对话，提取9个HR OS板块最新进展，逐一告诉我进度和里程碑」'); }
-function requestCodeSync() { alert('在 Claude 对话中发送：\n\n「请搜索 Claude Code 里的 HR OS 项目，提取 L1-L6 各层最新状态和进度」'); }
-
-// ─── INIT ────────────────────────────────────────────────────────────────────
-function render() { renderS1(); renderS2(); }
-
-loadLocal();
-
-// Try to load subs from local if available, else use defaults
-if (DATA.s2.every(s => s.subs.length === 0)) {
-  DEFAULT_SUBS.forEach(sub => {
-    const stream = DATA.s2.find(s => s.id === sub.stream_id);
-    if (stream) stream.subs.push({ id: uid(), ...sub });
-  });
-  saveLocal();
+async function pushToCloud() {
+  try {
+    await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: DATA }),
+    });
+    const t = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    setSyncStatus('ok', '已保存到云端', t);
+  } catch (e) {
+    console.error('推送云端失败:', e);
+  }
 }
 
-render();
-
-// Manual sync only - don't auto-sync on load
-setSyncStatus('err', '未连接飞书（点「从飞书同步」按钮手动同步）');
 </script>
 </body>
 </html>

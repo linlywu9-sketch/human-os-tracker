@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -116,6 +117,7 @@ button,input,textarea,select{font-family:'DM Sans',sans-serif;outline:none}
   </div>
   <div class="hdr-actions">
     <button class="btn btn-green" onclick="syncFromFeishu()">↻ 从飞书同步</button>
+    <button class="btn" onclick="confirmBatchPush()" id="push-btn">↑ 初始化到飞书</button>
     <button class="btn" onclick="openSettings()">⚙ 飞书配置</button>
     <button class="btn btn-primary" onclick="requestClaudeSync()">Claude 同步 ↗</button>
   </div>
@@ -702,6 +704,63 @@ function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 document.addEventListener('click', e => { if (e.target.classList.contains('overlay')) e.target.classList.remove('show'); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.overlay.show').forEach(el => el.classList.remove('show')); });
+
+// ─── BATCH PUSH TO FEISHU ───────────────────────────────────────────────────
+async function confirmBatchPush() {
+  const allSubs = DATA.s2.flatMap(s => s.subs);
+  if (!confirm(`将把本地 ${allSubs.length} 条子项目全部写入飞书多维表，飞书现有数据会被清空后重新写入。确认继续？`)) return;
+  await batchPushToFeishu();
+}
+
+async function batchPushToFeishu() {
+  const btn = document.getElementById('push-btn');
+  btn.textContent = '写入中...'; btn.disabled = true;
+  setSyncStatus('loading', '正在清空飞书旧数据...');
+
+  try {
+    // Step 1: Get all existing records and delete them
+    const existing = await feishuRequest({ method: 'list' });
+    const records = existing.items || [];
+    setSyncStatus('loading', `正在删除 ${records.length} 条旧记录...`);
+
+    for (const rec of records) {
+      await feishuDelete(rec.record_id);
+    }
+
+    // Step 2: Push all local subs
+    const allSubs = DATA.s2.flatMap(s => {
+      const meta = STREAMS_META.find(m => m.id === s.id);
+      return s.subs.map(sub => ({ ...sub, stream_id: s.id, stream_name: meta?.name || '' }));
+    });
+
+    setSyncStatus('loading', `正在写入 ${allSubs.length} 条数据...`);
+    let done = 0;
+    for (const sub of allSubs) {
+      const rec = await feishuCreate(sub, { name: sub.stream_name });
+      // Update local record_id
+      DATA.s2 = DATA.s2.map(s => {
+        if (s.id !== sub.stream_id) return s;
+        return { ...s, subs: s.subs.map(x => x.id === sub.id ? { ...x, record_id: rec.record_id, id: rec.record_id } : x) };
+      });
+      done++;
+      setSyncStatus('loading', `写入中 ${done}/${allSubs.length}...`);
+    }
+
+    feishuConnected = true;
+    saveLocal();
+    const t = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    setSyncStatus('ok', `✓ 已成功写入飞书 ${allSubs.length} 条数据`, t);
+    render();
+    alert(`✅ 完成！${allSubs.length} 条子项目已全部写入飞书多维表，现在网页修改会实时同步到飞书。`);
+
+  } catch (e) {
+    setSyncStatus('err', '写入失败: ' + e.message);
+    alert('写入失败: ' + e.message);
+    console.error(e);
+  }
+
+  btn.textContent = '↑ 初始化到飞书'; btn.disabled = false;
+}
 
 // ─── SYNC PROMPTS ────────────────────────────────────────────────────────────
 function requestClaudeSync() { alert('在 Claude 对话中发送：\n\n「请搜索历史对话，提取9个HR OS板块最新进展，逐一告诉我进度和里程碑」'); }

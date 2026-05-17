@@ -336,16 +336,19 @@ function tsToDate(ts) {
   return new Date(ts).toISOString().slice(0, 10);
 }
 
-// function toFeishuFields(f) {
-  const out = {};
-  if (f.stream_id != null) out['板块ID'] = Number(f.stream_id);
-  if (f.stream_name)       out['板块名称'] = f.stream_name;
-  if (f.name)              out['子项目'] = f.name;
-  if (f.status)            out['状态'] = { text: f.status };
-  if (f.milestone)         out['里程碑'] = f.milestone;
-  if (f.owner)             out['负责人'] = f.owner;
-  if (f.date)              out['日期'] = new Date(f.date).getTime();
-  return out;
+// Parse a Feishu record into local sub format
+function parseRecord(rec) {
+  const f = rec.fields;
+  return {
+    id: rec.record_id,
+    record_id: rec.record_id,
+    stream_id: Number(f['板块ID']) || 0,
+    name: f['子项目'] || '',
+    status: (typeof f['状态'] === 'object' ? f['状态']?.text : f['状态']) || '待立项',
+    milestone: f['里程碑'] || '',
+    owner: f['负责人'] || '',
+    date: f['日期'] ? tsToDate(f['日期']) : '',
+  };
 }
 
 async function feishuRequest(body) {

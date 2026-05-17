@@ -782,10 +782,8 @@ if (DATA.s2.every(s => s.subs.length === 0)) {
 
 render();
 
-// Auto-sync from Feishu on load
-syncFromFeishu().catch(() => {
-  setSyncStatus('err', '未连接飞书（数据来自本地缓存）');
-});
+// Manual sync only - don't auto-sync on load
+setSyncStatus('err', '未连接飞书（点「从飞书同步」按钮手动同步）');
 </script>
 </body>
 </html>
